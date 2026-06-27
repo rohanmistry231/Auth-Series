@@ -1,115 +1,199 @@
 # 08 — Single Sign-On (SSO)
 
-SSO lets users authenticate **once** and access **multiple applications** without re-entering credentials. It's the foundation of enterprise auth, Google Workspace, Microsoft 365, and every modern identity platform.
+SSO allows a user to authenticate **once** and gain access to **multiple applications** without re-entering credentials. It is the foundation of enterprise identity management.
 
-## SSO Architectures
+---
 
-### 1. Same-Domain (Cookie-Based)
+## 1. SSO Topologies
 
-```
-                    auth.example.com (SSO Cookie)
-                           │
-            ┌──────────────┼──────────────┐
-            │              │              │
-         app1           app2           app3
-        .example        .example       .example
-```
-
-Cookie shared across subdomains via `Domain=.example.com`. Simple, but limited to one parent domain.
-
-### 2. Cross-Domain (Token Exchange)
+### 1.1 Same-Domain SSO (Cookie-Based)
 
 ```
-                     ┌──────────────┐
-                     │  Auth Server │
-                     │  sso.example │
-                     └──────┬───────┘
-                            │
-            ┌───────────────┼───────────────┐
-            │  Login +      │               │
-            │  redirect     │  Login +      │
-            │  with token   │  redirect     │
-            ▼               │  with token   ▼
-        ┌──────┐            │            ┌──────┐
-        │ App1 │◄───────────┘            │ App2 │
-        │ .com │      Validate token     │ .org │
-        └──────┘                         └──────┘
+Browser                     Auth (auth.example.com)       App1, App2, App3
+  │                              │                        (.example.com)
+  │  POST /login                 │
+  │─────────────────────────────>│
+  │                              │
+  │  Set-Cookie: sso_session=abc │
+  │  Domain=.example.com         │
+  │<─────────────────────────────│
+  │                              │
+  │  GET app1.example.com        │
+  │  Cookie: sso_session=abc     │
+  │─────────────────────────────────────────────────────>│
+  │                              │                        │
+  │  App1 validates cookie       │                        │
+  │  with shared session store   │                        │
+  │<──────────────────────────────────────────────────────│
+  │                              │                        │
+  │  GET app2.example.com        │                        │
+  │  Cookie: sso_session=abc     │                        │
+  │─────────────────────────────────────────────────────────────────>│
+  │                              │                        │
+  │  (already authenticated)     │                        │
+  │<──────────────────────────────────────────────────────────────────│
 ```
 
-This is what we build here — a cross-domain SSO using JWT tokens.
-
-## SSO Flow
-
-```mermaid
-sequenceDiagram
-    participant B as Browser
-    participant A1 as App1 (8001)
-    participant A2 as App2 (8002)
-    participant SSO as SSO Server (8000)
-
-    B->>A1: GET /dashboard
-    A1-->>B: No session — Redirect to SSO
-    B->>SSO: GET /login?redirect=app1
-    SSO-->>B: Login form
-    B->>SSO: POST /sso/login
-    Note over B,SSO: User authenticates, SSO cookie set
-    SSO-->>B: Redirect with sso_token<br>http://app1/sso/cb
-    B->>A1: SSO callback
-    Note over A1: Validate token<br>Create local session
-
-    B->>A2: User visits App2
-    Note over A2: No session, redirect to SSO
-    A2-->>B: Redirect to SSO
-    B->>SSO: Already has SSO cookie!
-    SSO-->>B: Redirect with token
-    B->>A2: Validate token<br>Create local session
-    A2-->>B: Dashboard
-```
+### 1.2 Cross-Domain SSO (Federated — OIDC / SAML)
 
 ```
-Browser                 App1 (localhost:8001)       App2 (localhost:8002)     SSO Server (localhost:8000)
-  │                          │                          │                          │
-  │ GET /dashboard           │                          │                          │
-  │─────────────────────────>│                          │                          │
-  │                          │ No session               │                          │
-  │<─── Redirect to SSO ─────│                          │                          │
-  │                          │                          │                          │
-  │ GET /login?redirect=app1 │                          │                          │
-  │──────────────────────────────────────────────────────────────────────────────>│
-  │                          │                          │                          │
-  │ (User logs in)           │                          │                          │
-  │<──────────────────────────────────────────────────────────────────────────────│
-  │                          │                          │                          │
-  │ POST /sso/login          │                          │                          │
-  │──────────────────────────────────────────────────────────────────────────────>│
-  │                          │                          │                          │
-  │ Redirect with sso_token  │                          │                          │
-  │<─── http://app1/sso/cb ──│──────────────────────────│──────────────────────────│
-  │                          │                          │                          │
-  │ App1 validates token,    │                          │                          │
-  │ creates local session    │                          │                          │
-  │                          │                          │                          │
-  │ User now visits App2     │                          │                          │
-  │────────────────────────────────────────────────────>│                          │
-  │                          │                          │                          │
-  │ No session, redirect to  │                          │                          │
-  │ SSO — already has SSO    │                          │                          │
-  │ cookie!                  │                          │                          │
-  │<──── Redirect with token─│──────────────────────────│──────────────────────────│
-  │                          │                          │                          │
-  │ App2 validates token,    │                          │                          │
-  │ creates local session    │                          │                          │
+Browser                  IdP                      App1                    App2
+  │                       │                        │                      │
+  │  Access App1          │                        │                      │
+  │───────────────────────────────────────────────>│                      │
+  │                       │                        │                      │
+  │  Redirect to IdP      │                        │                      │
+  │<───────────────────────────────────────────────│                      │
+  │                       │                        │                      │
+  │──────────────────────>│                        │                      │
+  │                       │                        │                      │
+  │  User authenticates   │                        │                      │
+  │<──────────────────────│                        │                      │
+  │                       │                        │                      │
+  │  Token for App1       │                        │                      │
+  │───────────────────────────────────────────────>│                      │
+  │                       │                        │                      │
+  │  Session set          │                        │                      │
+  │<───────────────────────────────────────────────│                      │
+  │                       │                        │                      │
+  │  Access App2          │                        │                      │
+  │──────────────────────────────────────────────────────────────────────>│
+  │                       │                        │                      │
+  │  No session →         │                        │                      │
+  │  redirect to IdP      │                        │                      │
+  │<──────────────────────────────────────────────────────────────────────│
+  │                       │                        │                      │
+  │  Redirect with token  │                        │                      │
+  │  (silent, IdP cookie  │                        │                      │
+  │  already authentic)   │                        │                      │
+  │──────────────────────────── Token for App2 ──────────────────────────>│
+  │                       │                        │                      │
+  │  Session set          │                        │                      │
+  │<──────────────────────────────────────────────────────────────────────│
 ```
 
-## Code Examples
+---
 
-| Language | SSO Server | App1 | App2 |
-|----------|------------|------|------|
-| [Python](python/) | FastAPI | FastAPI | FastAPI |
-| [TypeScript](typescript/) | Node.js | Node.js | Node.js |
-| [Go](go/) | net/http | net/http | net/http |
+## 2. SSO Protocols — Decision Matrix
 
-## References
+| Protocol | Transport | Token | Federation | Mobile | Complexity |
+|----------|-----------|-------|------------|--------|------------|
+| **SAML 2.0** | Browser + SOAP | XML Assertion | Cross-org | Poor (ECP) | High |
+| **OIDC** | HTTP REST | JWT | Cross-org | Native | Low |
+| **CAS** | Browser + Ticket | Service Ticket | Within org | Poor | Medium |
+| **Kerberos** | Network protocol | Ticket | Windows domain | None | Medium |
 
-- [NIST SP 800-63 — Digital Identity Guidelines](https://pages.nist.gov/800-63-3/)
-- [OIDC SSO Patterns](https://auth0.com/docs/authenticate/single-sign-on)
+---
+
+## 3. IdP-Initiated vs SP-Initiated
+
+### SP-Initiated (most common)
+
+```
+User → SP (no session) → SP redirects to IdP → IdP authenticates → IdP redirects back → SP creates session
+```
+
+### IdP-Initiated (portal model)
+
+```
+User → IdP → IdP authenticates → User selects an app → IdP issues assertion → App validates → Session created
+```
+
+---
+
+## 4. Single Logout (SLO)
+
+### Front-Channel Logout (browser redirect)
+
+```
+1. User clicks "Logout" in App1
+2. App1 redirects browser to IdP logout endpoint
+3. IdP clears its session
+4. IdP loads iframes/redirects from each registered SP's logout URL
+5. Each SP clears its local session
+6. User is logged out everywhere
+```
+
+### Back-Channel Logout (SOAP)
+
+```
+1. User logs out of App1
+2. App1 calls IdP's SLO endpoint (SOAP — not via browser)
+3. IdP sends SOAP logout requests to all SPs
+4. Each SP clears session and acknowledges
+```
+
+---
+
+## 5. Security Considerations
+
+| Threat | Description | Mitigation |
+|--------|-------------|------------|
+| **SSO SPOF** | IdP outage blocks all app access | IdP clustering, failover IdP |
+| **IdP compromise** | Attacker controls IdP = all apps compromised | Hardware security modules, MFA for IdP admin |
+| **Session hijacking** | SSO session stolen = all apps accessible | Short session TTL, device binding |
+| **SLO failure** | Logout from one app does not propagate | Both front-channel and back-channel SLO |
+| **Cross-domain cookie** | Browser isolates cookies by domain | Use federated tokens (OIDC/SAML), not cookies |
+
+---
+
+## 6. Code Examples
+
+### Java (Spring Security — OIDC SSO)
+
+```java
+// build.gradle: implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
+
+@Configuration
+@EnableWebSecurity
+public class SsoConfig {
+
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        http
+            .saml2Login(saml2 -> saml2     // SAML for enterprise
+                .relyingPartyRegistration(...))
+            .oauth2Login(oauth2 -> oauth2  // OIDC for modern
+                .clientRegistrationRepository(clientRegistrations()))
+            .authorizeHttpRequests(authz -> authz
+                .requestMatchers("/login", "/logout").permitAll()
+                .anyRequest().authenticated())
+            .logout(logout -> logout
+                .logoutSuccessHandler(ssoLogoutHandler()));
+        return http.build();
+    }
+
+    @Bean
+    public ClientRegistrationRepository clientRegistrations() {
+        return new InMemoryClientRegistrationRepository(
+            ClientRegistration.withRegistrationId("oidc")
+                .issuerUri("https://idp.example.com")
+                .clientId("sso-client")
+                .clientSecret("sso-secret")
+                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                .redirectUri("{baseUrl}/login/oauth2/code/{registrationId}")
+                .scope("openid", "profile", "email")
+                .build()
+        );
+    }
+
+    private LogoutSuccessHandler ssoLogoutHandler() {
+        return (request, response, authentication) -> {
+            // Front-channel logout: redirect to IdP
+            String idpLogoutUrl = "https://idp.example.com/logout?"
+                + "post_logout_redirect_uri="
+                + URLEncoder.encode("https://app.example.com", UTF_8);
+            response.sendRedirect(idpLogoutUrl);
+        };
+    }
+}
+```
+
+---
+
+## 7. References
+
+- [NIST SP 800-63 — Digital Identity](https://pages.nist.gov/800-63-3/)
+- [OIDC SSO (Auth0)](https://auth0.com/docs/authenticate/single-sign-on)
+- [SAML SSO (Okta)](https://www.okta.com/single-sign-on/)
+- [OpenID Connect Session Management](https://openid.net/specs/openid-connect-session-1_0.html)

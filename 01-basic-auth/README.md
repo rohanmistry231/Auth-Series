@@ -1,85 +1,242 @@
 # 01 — HTTP Basic Authentication
 
-HTTP Basic Auth is the simplest authentication mechanism defined in [RFC 7617](https://datatracker.ietf.org/doc/html/rfc7617). The client sends a username and password encoded as a Base64 string in the `Authorization` header.
+RFC 7617 defines the most minimal authentication scheme in the HTTP standard. It is included here not for production use, but as a **didactic baseline** — every other scheme in this series is a response to Basic Auth's shortcomings.
 
-## How It Works
+---
 
-```mermaid
-sequenceDiagram
-    participant C as Client
-    participant S as Server
-
-    C->>S: GET /protected
-    S-->>C: 401 Unauthorized<br>WWW-Authenticate: Basic
-    Note over C: Encode alice:secret123<br>as Base64
-    C->>S: GET /protected<br>Authorization: Basic YWxpY2U6c2VjcmV0MTIz
-    S->>S: Decode Base64<br>Split on ":"
-    alt Valid credentials
-        S-->>C: 200 OK (resource)
-    else Invalid credentials
-        S-->>C: 401 Unauthorized
-    end
-```
+## 1. Wire Format
 
 ```
 Request:
-  GET /protected-resource HTTP/1.1
-  Authorization: Basic base64(username:password)
+  GET /protected HTTP/1.1
+  Authorization: Basic QWxhZGRpbjpPcGVuU2VzYW1l
 
-Server:
-  1. Decode the Base64 value
-  2. Split on ':' to get username and password
-  3. Validate against credential store
-  4. Return 200 ✅ or 401 ❌
+The string "QWxhZGRpbjpPcGVuU2VzYW1l" is:
+  base64("Aladdin:OpenSesame")
+  → "QWxhZGRpbjpPcGVuU2VzYW1l"
 ```
 
-### Wire Format
+### Character-by-character breakdown
+
+| Offset | Byte | Meaning |
+|--------|------|---------|
+| 0 | `41` → `A` | First byte of base64 output |
+| 1–7 | — | ... |
+| *middle* | `3a` → `:` | The colon separator (ASCII 0x3A) |
+| ... | — | ... |
+| last | `3d` → `=` | Base64 padding |
+
+The colon is the **only delimiter** — usernames containing `:` are ambiguous per the spec (practical servers URL-encode or reject them).
 
 ```
-credentials = base64encode(username + ":" + password)
-header     = "Basic " + credentials
-
-Example:
-  username: "alice"
-  password: "secret123"
-  raw:      "alice:secret123"
-  b64:      "YWxpY2U6c2VjcmV0MTIz"
-  header:   "Basic YWxpY2U6c2VjcmV0MTIz"
+Server response (unauthorized):
+  HTTP/1.1 401 Unauthorized
+  WWW-Authenticate: Basic realm="User Visible Realm Name"
 ```
 
-## Security Considerations
+---
 
-| Concern | Risk | Mitigation |
-|---------|------|------------|
-| Credentials in transit | **High** — Base64 is **not** encryption | **Must** use HTTPS/TLS |
-| Credentials on client | **High** — browser caches, autofill | Session-based alternative preferred |
-| Credential replay | **High** — sent on every request | Short credentials, IP binding, rate limiting |
-| No logout mechanism | **Medium** — no session to invalidate | Combine with a session layer |
-| CSRF | **Low** — browser native (not cookie-based) | Still apply CSRF defenses if mixed with cookies |
+## 2. Protocol State Machine
 
-> **⚠️ Never use Basic Auth without HTTPS.** Base64 is trivially reversible. Any attacker on the network path can read credentials in plaintext.
+```
+     ┌────────────────┐
+     │  UNPROMPTED    │  — request without Authorization header
+     └───────┬────────┘
+             │ server returns 401 + WWW-Authenticate
+             ▼
+     ┌────────────────┐
+     │  CHALLENGED    │  — client SHOULD retry with credentials
+     └───────┬────────┘
+             │
+     ┌───────┴────────┐
+     ▼                ▼
+┌──────────┐   ┌──────────┐
+│ GRANTED  │   │ DENIED   │  — server returns 403
+│ 200      │   │ 403      │    (or 401 again)
+└──────────┘   └──────────┘
+```
 
-## When to Use
+Note: there is **no logout** state. The browser caches credentials until the tab is closed.
 
-| Use Case | Recommendation |
-|----------|---------------|
-| **Internal APIs** (service-to-service) | ✅ Acceptable with HTTPS + strong credentials |
-| **Development / testing** | ✅ Convenient; disable in production |
-| **Web browser forms** | ❌ Use session cookies + CSRF tokens |
-| **Public-facing APIs** | ❌ Use Bearer tokens (JWT, opaque) or OAuth 2.0 |
-| **CLI tools / scripts** | ✅ Common pattern — use with env vars, not hardcoded |
+---
 
-## Code Examples
+## 3. Security Analysis (STRIDE)
 
-| Language | Server | Client |
-|----------|--------|--------|
-| [Python](python/) | FastAPI middleware | httpx with auth |
-| [TypeScript](typescript/) | Express middleware | fetch with encoding |
-| [Go](go/) | net/http handler | net/http with auth |
+| Threat | Severity | Explanation |
+|--------|----------|-------------|
+| **S**poofing | Critical | Base64 is trivial to decode; anyone who sees the header has the password |
+| **T**ampering | Low | Credentials are not signed — but tampering them just breaks auth |
+| **R**epudiation | Medium | No audit trail built-in |
+| **I**nformation Disclosure | Critical | Base64 is not encryption. Packet capture reveals plaintext credentials |
+| **D**enial of Service | Low | No state to exhaust, but login CPU cost applies |
+| **E**levation of Privilege | Low | AuthZ is separate |
 
-## References
+---
+
+## 4. Production Risk Assessment
+
+| Risk | Likelihood | Impact | Mitigation |
+|------|-----------|--------|------------|
+| Credential capture over HTTP | Certain (on non-TLS) | Total compromise | **Enforce TLS** (HSTS) |
+| Credential leakage in logs | High | Total compromise | Strip `Authorization` header from log pipelines |
+| CSRF (if browser remembers) | Medium | Unauthorized actions | CSRF tokens (if using Basic with cookies) |
+| Brute force | High | Account compromise | Rate limiting, account lockout |
+| Replay attack | High | Account compromise | Nonce? Basic Auth has none. Use TLS to prevent capture. |
+
+---
+
+## 5. When (Not) to Use Basic Auth
+
+### Acceptable use cases
+
+- **Internal health checks**: `GET /health` with a fixed credential
+- **Development / debugging**: Curl, Postman, HTTPie
+- **Legacy compatibility**: Integrating with a system that only supports Basic
+- **TLS-terminated internal networks**: Between services on the same Kubernetes cluster
+
+### Unacceptable use cases
+
+- **User-facing web applications**: Every other scheme is better
+- **Public APIs**: Use Bearer tokens or API keys
+- **Any endpoint without TLS**: Credentials are wire-readable
+- **Mobile apps**: Credentials hard to rotate, no logout
+
+---
+
+## 6. Code Examples
+
+### Java (Spring Boot Filter)
+
+```java
+@Component
+public class BasicAuthFilter extends OncePerRequestFilter {
+
+    private static final String REALM = "Auth Series";
+
+    @Override
+    protected void doFilterInternal(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            FilterChain chain) throws IOException, ServletException {
+
+        String auth = request.getHeader("Authorization");
+
+        if (auth == null || !auth.startsWith("Basic ")) {
+            response.setHeader("WWW-Authenticate",
+                "Basic realm=\"" + REALM + "\"");
+            response.sendError(401, "Unauthorized");
+            return;
+        }
+
+        try {
+            String base64 = auth.substring(6);
+            String decoded = new String(
+                Base64.getDecoder().decode(base64),
+                StandardCharsets.UTF_8);
+            int colon = decoded.indexOf(':');
+
+            if (colon == -1) {
+                response.sendError(400, "Invalid credential format");
+                return;
+            }
+
+            String username = decoded.substring(0, colon);
+            String password = decoded.substring(colon + 1);
+
+            // Delegate to authentication provider
+            if (!authenticate(username, password)) {
+                response.sendError(403, "Forbidden");
+                return;
+            }
+
+            request.setAttribute("auth.user", username);
+            chain.doFilter(request, response);
+
+        } catch (IllegalArgumentException e) {
+            response.sendError(400, "Invalid Base64 encoding");
+        }
+    }
+
+    private boolean authenticate(String username, String password) {
+        // NEVER hardcode. Delegate to UserDetailsService / LDAP / etc.
+        return "admin".equals(username) && "secret".equals(password);
+    }
+}
+```
+
+### Python (FastAPI)
+
+```python
+@app.get("/protected")
+async def protected(request: Request):
+    auth = request.headers.get("Authorization")
+    if not auth or not auth.startswith("Basic "):
+        raise HTTPException(
+            status_code=401,
+            headers={"WWW-Authenticate": "Basic realm=\"Auth Series\""}
+        )
+
+    decoded = base64.b64decode(auth.removeprefix("Basic ")).decode("utf-8")
+    username, _, password = decoded.partition(":")
+
+    if not verify_user(username, password):
+        raise HTTPException(status_code=403)
+
+    return {"user": username}
+```
+
+### TypeScript (Node.js Express)
+
+```typescript
+function basicAuth(req: Request, res: Response, next: NextFunction) {
+  const auth = req.headers['authorization'];
+  if (!auth?.startsWith('Basic ')) {
+    res.setHeader('WWW-Authenticate', 'Basic realm="Auth Series"');
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const decoded = Buffer.from(auth.slice(6), 'base64').toString('utf-8');
+  const colon = decoded.indexOf(':');
+  if (colon === -1) return res.status(400).json({ error: 'Invalid format' });
+
+  const username = decoded.slice(0, colon);
+  const password = decoded.slice(colon + 1);
+
+  if (!verifyUser(username, password)) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  req.user = username;
+  next();
+}
+```
+
+### Go (net/http)
+
+```go
+func BasicAuthMiddleware(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        user, pass, ok := r.BasicAuth()
+        if !ok {
+            w.Header().Set("WWW-Authenticate", `Basic realm="Auth Series"`)
+            http.Error(w, "Unauthorized", http.StatusUnauthorized)
+            return
+        }
+        if !verifyUser(user, pass) {
+            http.Error(w, "Forbidden", http.StatusForbidden)
+            return
+        }
+        ctx := context.WithValue(r.Context(), "user", user)
+        next.ServeHTTP(w, r.WithContext(ctx))
+    })
+}
+```
+
+---
+
+## 7. References
 
 - [RFC 7617 — The 'Basic' HTTP Authentication Scheme](https://datatracker.ietf.org/doc/html/rfc7617)
-- [RFC 7235 — HTTP/1.1 Authentication](https://datatracker.ietf.org/doc/html/rfc7235)
-- [Mozilla MDN — Authorization header](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Authorization)
-- [OWASP — Basic Auth](https://owasp.org/www-community/controls/Basic_Authentication)
+- [RFC 7235 — HTTP Authentication Framework](https://datatracker.ietf.org/doc/html/rfc7235)
+- [MDN — HTTP Authentication](https://developer.mozilla.org/en-US/docs/Web/HTTP/Authentication)
+- [OWASP — Basic Authentication](https://owasp.org/www-community/controls/Basic_Authentication)

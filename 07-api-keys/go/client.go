@@ -68,7 +68,7 @@ func main() {
 	fmt.Printf("  %d: %v\n", prot.Status, prot.Body)
 
 	fmt.Println("\n=== Protected (invalid key) ===")
-	bad, _ := request("GET", "/api/data", nil, "user_stripe_key_invalid")
+	bad, _ := request("GET", "/api/data", nil, "enter_api_key_here")
 	fmt.Printf("  %d: %v\n", bad.Status, bad.Body)
 
 	fmt.Println("\n=== Admin (no admin scope) ===")

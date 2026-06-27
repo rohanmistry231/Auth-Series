@@ -4,13 +4,13 @@
 
 ```
 prefix_secret_suffix
-user_stripe_key_example
+enter_api_key_here
 ```
 
 ## Generation
 
 ```
-prefix  = "user_stripe_key_"   (2-8 chars, identifies service)
+prefix  = "enter_api_key_here"   (2-8 chars, identifies service)
 secret  = random_bytes(32)      (high entropy)
 suffix  = hash(secret)[:8]       (for key lookup)
 
@@ -38,8 +38,8 @@ Given (user):  prefix + base64(secret) + suffix
 
 ```bash
 # Header
-curl -H "Authorization: Bearer user_stripe_key_..." https://api.example.com/data
+curl -H "Authorization: Bearer enter_api_key_here" https://api.example.com/data
 
 # Query param
-curl "https://api.example.com/data?api_key=user_stripe_key_..."
+curl "https://api.example.com/data?api_key=enter_api_key_here"
 ```

@@ -26,7 +26,7 @@ async function main() {
   console.log(`  ${prot.status}:`, prot.body);
 
   console.log("\n=== Protected (invalid key) ===");
-  const bad = await request("GET", "/api/data", undefined, "user_stripe_key_invalid");
+  const bad = await request("GET", "/api/data", undefined, "enter_api_key_here");
   console.log(`  ${bad.status}:`, bad.body);
 
   console.log("\n=== Admin (no admin scope) ===");

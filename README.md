@@ -79,26 +79,26 @@ If you're new to auth concepts, start with [00-foundations](00-foundations/). Fo
 
 ## Topics
 
-| # | Topic | Read | Python | TypeScript | Go |
-|---|-------|------|--------|------------|----|
-| 00 | [Foundations](00-foundations/) | ✅ | — | — | — |
-| 01 | [Basic Authentication](01-basic-auth/) | ✅ | ✅ | ✅ | ✅ |
-| 02 | [Session & Cookies](02-session-cookies/) | ✅ | ✅ | ✅ | ✅ |
-| 03 | [JWT (JSON Web Tokens)](03-jwt/) | ✅ | ✅ | ✅ | ✅ |
-| 04 | [OAuth 2.0](04-oauth2/) | ✅ | ✅ | ✅ | ✅ |
-| 05 | [OpenID Connect](05-oidc/) | ✅ | ✅ | ✅ | ✅ |
-| 06 | [SAML 2.0](06-saml/) | ✅ | ✅ | ✅ | ✅ |
-| 07 | [API Keys](07-api-keys/) | ✅ | ✅ | ✅ | ✅ |
-| 08 | [Single Sign-On (SSO)](08-sso/) | ✅ | ✅ | ✅ | ✅ |
-| 09 | [Multi-Factor Auth (MFA)](09-mfa/) | ✅ | ✅ | ✅ | ✅ |
-| 10 | [Passwordless Auth](10-passwordless/) | ✅ | ✅ | ✅ | ✅ |
-| 11 | [LDAP / Active Directory](11-ldap/) | ✅ | ✅ | ✅ | ✅ |
-| 12 | [Social Login](12-social-login/) | ✅ | ✅ | ✅ | ✅ |
-| 13 | [Bearer Tokens](13-bearer-token/) | ✅ | ✅ | ✅ | ✅ |
-| 14 | [Digest Access Auth](14-digest-auth/) | ✅ | ✅ | ✅ | ✅ |
-| 15 | [Central Auth Service (CAS)](15-cas/) | ✅ | ✅ | ✅ | ✅ |
-| 16 | [Auth Patterns & Architectures](16-auth-patterns/) | ✅ | ✅ | ✅ | ✅ |
-| 17 | [Security](17-security/) | ✅ | ✅ | ✅ | ✅ |
+| # | Topic | Read | Java | Python | TypeScript | Go | Rust |
+|---|-------|------|------|--------|------------|-----|------|
+| 00 | [Foundations](00-foundations/) | ✅ | — | — | — | — | — |
+| 01 | [Basic Authentication](01-basic-auth/) | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| 02 | [Session & Cookies](02-session-cookies/) | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| 03 | [JWT (JSON Web Tokens)](03-jwt/) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| 04 | [OAuth 2.0](04-oauth2/) | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| 05 | [OpenID Connect](05-oidc/) | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| 06 | [SAML 2.0](06-saml/) | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| 07 | [API Keys](07-api-keys/) | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| 08 | [Single Sign-On (SSO)](08-sso/) | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| 09 | [Multi-Factor Auth (MFA)](09-mfa/) | ✅ | ✅ | ✅ | ✅ | — | — |
+| 10 | [Passwordless Auth](10-passwordless/) | ✅ | ✅ | ✅ | ✅ | — | — |
+| 11 | [LDAP / Active Directory](11-ldap/) | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| 12 | [Social Login](12-social-login/) | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| 13 | [Bearer Tokens](13-bearer-token/) | ✅ | ✅ | ✅ | ✅ | — | — |
+| 14 | [Digest Access Auth](14-digest-auth/) | ✅ | ✅ | ✅ | — | — | — |
+| 15 | [Central Auth Service (CAS)](15-cas/) | ✅ | ✅ | ✅ | ✅ | — | — |
+| 16 | [Auth Patterns & Architectures](16-auth-patterns/) | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| 17 | [Security](17-security/) | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 
 ---
 

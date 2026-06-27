@@ -24,7 +24,7 @@ def main():
     print(f"  {resp.status_code}: {resp.json()}")
 
     print("\n=== Protected endpoint (invalid key) ===")
-    resp = client.get("/api/data", headers={"X-API-Key": "user_stripe_key_invalid"})
+    resp = client.get("/api/data", headers={"X-API-Key": "enter_api_key_here"})
     print(f"  {resp.status_code}: {resp.json()}")
 
     print("\n=== Admin endpoint (no admin scope) ===")
